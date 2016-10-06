@@ -1,0 +1,32 @@
+AccessorMethodName:
+  Enabled: false
+
+Alias:
+  Enabled: false
+
+BlockNesting:
+  Enabled: false
+
+ClassLength:
+  Enabled: false
+
+CyclomaticComplexity:
+  Enabled: false
+
+Documentation:
+  Enabled: false
+
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
+  Enabled: false
+
+LineLength:
+  Max: 600
+
+MethodLength:
+  Max: 20
+
+Style/GlobalVars:
+  Enabled: false

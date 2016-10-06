@@ -1,0 +1,21 @@
+{
+  /*"type": "object",
+  "required": ["username", "password", "token", "client_id", "client_secret"],
+  "properties": {
+    "username": {
+      "type": "string"
+    },
+    "password": {
+      "type": "string"
+    },
+    "token": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string"
+    },
+    "client_secret": {
+      "type": "string"
+    }
+  }*/
+}
