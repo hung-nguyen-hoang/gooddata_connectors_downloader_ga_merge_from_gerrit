@@ -2,17 +2,15 @@ module GoodData
   module Connectors
     module GoogleAnalyticsDownloader
       class DownloaderGoogleAnalytics < Base::BaseDownloader
-
         attr_accessor :ga
 
         require 'google/apis/analyticsreporting_v4'
 
         GA = Google::Apis::AnalyticsreportingV4
-        TYPE = 'ga'
-        CUSTOM_FIELDS = ['segment','filter','profile']
+        TYPE = 'ga'.freeze
+        CUSTOM_FIELDS = %w(segment filter profile).freeze
 
         def initialize(metadata, options = {})
-          # @type = 'ga'
           $now = GoodData::Connectors::Metadata::Runtime.now
           super(metadata, options)
         end
@@ -24,7 +22,6 @@ module GoodData
           options[:refresh_token] = @metadata.get_configuration_by_type_and_key(TYPE, 'refresh_token')
           options[:client_id] = @metadata.get_configuration_by_type_and_key(TYPE, 'client_id')
           options[:client_secret] = @metadata.get_configuration_by_type_and_key(TYPE, 'client_secret')
-          options[:client_logger] = @metadata.get_configuration_by_type_and_key(TYPE, 'client_logger').nil? ? false : true
 
           self.ga = log_in(options)
         end
@@ -40,14 +37,14 @@ module GoodData
         end
 
         def get_segments(line)
-          segment = line["segment"]
+          segment = line['segment']
           return nil unless segment
           [GA::Segment.new(segment_id: segment)]
         end
 
         def get_metrics(entity)
           metrics = entity.custom['metrics']
-          raise "Metrics are missing in entity configuration" unless metrics
+          raise 'Metrics are missing in entity configuration' unless metrics
           metrics_arr = []
           metrics.split(',').each do |metric|
             metrics_arr << GA::Metric.new(expression: metric)
@@ -62,8 +59,8 @@ module GoodData
         end
 
         def get_report(entity, line, start_date, end_date)
-          profile_id = line["profile_id"]
-          raise "Missing profile id" unless profile_id
+          profile_id = line['profile_id']
+          raise 'Missing profile id' unless profile_id
 
           date_ranges = [GA::DateRange.new(start_date: start_date, end_date: end_date)]
           report_request = GA::ReportRequest.new(
@@ -73,11 +70,11 @@ module GoodData
             filters_expression: get_filters(line),
             sampling_level: 'LARGE',
             metrics: get_metrics(entity),
-            page_size: 10000,
+            page_size: 10_000,
             view_id: line['profile_id']
           )
           report_requests = GA::GetReportsRequest.new(report_requests: [report_request])
-          data = ga.batch_get_reports(report_requests).reports.first
+          ga.batch_get_reports(report_requests).reports.first
         end
 
         def save_report_data(entity, report, start_date, line)
@@ -85,24 +82,24 @@ module GoodData
           CSV.open(local_path, 'w', col_sep: ',') do |csv|
             csv << get_headers(report)
             report.data.rows.each do |row|
-              csv << row.dimensions + row.metrics.first.values + [line['segment'],line['filters'],line['profile_id']]
+              csv << row.dimensions + row.metrics.first.values + [line['segment'], line['filters'], line['profile_id']]
             end
           end
           local_path
         end
 
         def download_data
-          $log.info "Processing queries info file"
+          $log.info 'Processing queries info file'
           csv = load_queries_csv
-          $log.info "Downloading data from Google Analytics"
+          $log.info 'Downloading data from Google Analytics'
           csv.each do |line|
             entity = @metadata.get_entity(line['entity'])
             next unless entity
-
-            start_date = entity.previous_runtime.empty? ? (DateTime.now - 14.days) : DateTime.parse(line["initial_load_start_date"])
+            full = @metadata.get_configuration_by_type_and_key(TYPE, 'full')
+            start_date = entity.previous_runtime.empty? || !full ? (DateTime.now - 14.days) : DateTime.parse(line['initial_load_start_date'])
             end_date = DateTime.now
             $log.info "Downloading entity #{entity.name}"
-            report = get_report(entity, line, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+            report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
             $log.info "Processing entity #{entity.name}"
             local_path = save_report_data(entity, report, start_date, line)
             load_metadata(entity, report)
@@ -126,7 +123,7 @@ module GoodData
           file = queries_path.split('/').last
           local_path = "tmp/#{file}"
           @metadata.download_data(queries_path, local_path)
-          parsed_file = File.open(local_path, 'r:bom|utf-8').read.gsub("'", "")
+          parsed_file = File.open(local_path, 'r:bom|utf-8').read.delete("'")
           CSV.parse(parsed_file, headers: true, header_converters: ->(h) { h.try(:downcase) }, row_sep: :auto, col_sep: ',')
         end
 
@@ -143,28 +140,27 @@ module GoodData
         def log_in(options)
           ga = GA::AnalyticsReportingService.new
           ga.authorization = Signet::OAuth2::Client.new(
-           token_credential_uri: 'https://www.googleapis.com/oauth2/v3/token',
-           client_id: options[:client_id],
-           client_secret: options[:client_secret],
-           refresh_token: options[:refresh_token],
-           grant_type: 'refresh_token'
-           )
+            token_credential_uri: 'https://www.googleapis.com/oauth2/v3/token',
+            client_id: options[:client_id],
+            client_secret: options[:client_secret],
+            refresh_token: options[:refresh_token],
+            grant_type: 'refresh_token'
+          )
           ga.authorization.fetch_access_token!
           ga
         end
 
         def get_headers(report)
           headers = report.column_header.dimensions
-          headers += report.column_header.metric_header.metric_header_entries.map {|header| header.name}
+          headers += report.column_header.metric_header.metric_header_entries.map(&:name)
           headers + CUSTOM_FIELDS
         end
 
         def load_metadata(entity, report)
-          unless entity.disabled?
-            load_entity_fields(entity, report)
-            load_entity_custom_metadata(entity)
-            metadata.save_entity(entity)
-          end
+          return nil unless entity.disabled?
+          load_entity_fields(entity, report)
+          load_entity_custom_metadata(entity)
+          metadata.save_entity(entity)
         end
 
         def load_entity_fields(entity, report)
@@ -184,7 +180,7 @@ module GoodData
             fields << new_field(header.name, get_field_type(header.type))
           end
           CUSTOM_FIELDS.each do |header|
-            fields << new_field(header, 'string-255')#maybe less?
+            fields << new_field(header, 'string-255') # maybe less?
           end
           fields
         end
@@ -206,11 +202,11 @@ module GoodData
           end
         end
 
-        def new_field(name,type)
+        def new_field(name, type)
           Metadata::Field.new('id' => name,
-                             'name' => name,
-                             'type' => type,
-                             'custom' => {})
+                              'name' => name,
+                              'type' => type,
+                              'custom' => {})
         end
 
         def load_fields_from_source(diff, metadata_entity)
