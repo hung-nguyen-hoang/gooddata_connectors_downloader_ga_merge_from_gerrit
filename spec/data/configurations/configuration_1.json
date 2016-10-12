@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "user": {
+      "global": {
+        "custom": {
+          "dimensions":"ga:date",
+          "metrics":"ga:users",
+          "hub": [
+            "ga:users", "profile", "ga:date"
+          ]
+        }
+      }
+    },
+    "user_type": {
+      "global": {
+        "custom": {
+          "dimensions":"ga:date,ga:usertype",
+          "metrics":"ga:users",
+          "hub": [
+            "ga:users", "profile", "ga:date"
+          ]
+        }
+      }
+    },
+    "site_traffic": {
+      "global": {
+        "custom": {
+          "dimensions":"ga:date,ga:deviceCategory,ga:source,ga:socialNetwork,ga:countryIsoCode,ga:hour,ga:hostname",
+          "metrics":"ga:sessions,ga:bounces,ga:sessionDuration,ga:pageviews,ga:entrances",
+          "hub": [
+            "ga:deviceCategory", "profile", "ga:date"
+          ]
+        }
+      }
+    },
+    "page_traffic": {
+      "global": {
+        "custom": {
+          "dimensions":"ga:date,ga:hostname,ga:pagePath,ga:pageTitle",
+          "metrics":"ga:bounces,ga:pageviews,ga:entrances",
+          "hub": [
+            "ga:pageTitle", "profile", "ga:date"
+          ]
+        }
+      }
+    }
+  },
+  "downloaders": {
+    "ga_downloader_1":{
+      "type": "ga",
+      "entities":[
+        "user",
+        "user_type",
+        "site_traffic",
+        "page_traffic"
+      ]
+    }
+  },
+  "integrators": {
+  },
+  "ga": {
+    "queries_info_file_path":"AIDAJFITXNOA7ZNFS3H4U_gdc-ms-connectors_ConnectorsTestSuite/testing/unit/ga_queries.csv",
+    "client_id": "309132283222-gauqrlg252aok1prqr9vnvp0imdc7ces.apps.googleusercontent.com",
+    "client_secret": "phX3tpCQnn4U-DoCNRiSSAkt",
+    "refresh_token": "1/g1-Bi6HTAdG449tTW5uagQM6KmSNMkyhmy47Lns3xbw"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "id": "user",
+  "name": "user",
+  "custom": {
+    "dimensions": "ga:date",
+    "metrics": "ga:users",
+    "hub": [
+      "ga:users",
+      "profile",
+      "ga:date"
+    ],
+    "automatic": true,
+    "download_by": "ga",
+    "escape_as": "\"",
+    "file_format": "GZIP"
+  },
+  "fields": [
+    {
+      "id": "ga:date",
+      "name": "ga:date",
+      "order": "g1",
+      "type": "date-false",
+      "custom": {
+
+      },
+      "enabled": true
+    },
+    {
+      "id": "ga:users",
+      "name": "ga:users",
+      "order": "g2",
+      "type": "integer",
+      "custom": {
+
+      },
+      "enabled": true
+    },
+    {
+      "id": "segment",
+      "name": "segment",
+      "order": "g3",
+      "type": "string-255",
+      "custom": {
+
+      },
+      "enabled": true
+    },
+    {
+      "id": "filter",
+      "name": "filter",
+      "order": "g4",
+      "type": "string-255",
+      "custom": {
+
+      },
+      "enabled": true
+    },
+    {
+      "id": "profile",
+      "name": "profile",
+      "order": "g5",
+      "type": "string-255",
+      "custom": {
+
+      },
+      "enabled": true
+    }
+  ],
+  "enabled": true,
+  "type": "input|output",
+  "dependent_on": null,
+  "version": "default"
+}

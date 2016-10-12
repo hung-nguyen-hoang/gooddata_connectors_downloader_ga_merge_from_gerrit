@@ -4,6 +4,7 @@ module GoodData
       class DownloaderGoogleAnalytics < Base::BaseDownloader
         attr_accessor :ga
 
+        require 'active_support/all'
         require 'google/apis/analyticsreporting_v4'
 
         GA = Google::Apis::AnalyticsreportingV4
@@ -124,7 +125,7 @@ module GoodData
           local_path = "tmp/#{file}"
           @metadata.download_data(queries_path, local_path)
           parsed_file = File.open(local_path, 'r:bom|utf-8').read.delete("'")
-          CSV.parse(parsed_file, headers: true, header_converters: ->(h) { h.try(:downcase) }, row_sep: :auto, col_sep: ',')
+          CSV.parse(parsed_file, headers: true, header_converters: ->(h) { h.downcase }, row_sep: :auto, col_sep: ',')
         end
 
         def save_data(metadata_entity, local_path, start_date, end_date)
@@ -157,7 +158,7 @@ module GoodData
         end
 
         def load_metadata(entity, report)
-          return nil unless entity.disabled?
+          return nil if entity.disabled?
           load_entity_fields(entity, report)
           load_entity_custom_metadata(entity)
           metadata.save_entity(entity)
