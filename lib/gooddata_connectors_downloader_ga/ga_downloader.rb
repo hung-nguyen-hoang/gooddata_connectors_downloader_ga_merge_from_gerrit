@@ -204,8 +204,8 @@ module GoodData
         end
 
         def new_field(name, type)
-          Metadata::Field.new('id' => name,
-                              'name' => name,
+          Metadata::Field.new('id' => name.split(':').last,
+                              'name' => name.split(':').last,
                               'type' => type,
                               'custom' => {})
         end
