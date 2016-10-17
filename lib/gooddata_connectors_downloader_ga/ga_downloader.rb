@@ -97,7 +97,8 @@ module GoodData
             entity = @metadata.get_entity(line['entity'])
             next unless entity
             full = @metadata.get_configuration_by_type_and_key(TYPE, 'full')
-            start_date = entity.previous_runtime.empty? || !full ? (DateTime.now - 14.days) : DateTime.parse(line['initial_load_start_date'])
+            rolling_days = @metadata.get_configuration_by_type_and_key(TYPE, 'rolling_days') || 14
+            start_date = entity.previous_runtime.empty? || !full ? (DateTime.now - rolling_days.to_i.days) : DateTime.parse(line['initial_load_start_date'])
             end_date = DateTime.now
             $log.info "Downloading entity #{entity.name}"
             report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
@@ -254,6 +255,7 @@ module GoodData
             metadata_entity.custom['file_format'] = 'GZIP'
             metadata_entity.make_dirty
           end
+          metadata_entity.custom['hub'] = metadata_entity.custom['hub'].map{|key| key.split(':').last}
           metadata_entity.store_runtime_param('full', true) if metadata_entity.custom['full']
         end
 
