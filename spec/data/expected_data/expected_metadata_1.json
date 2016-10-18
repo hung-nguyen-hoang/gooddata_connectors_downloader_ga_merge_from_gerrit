@@ -5,9 +5,9 @@
     "dimensions": "ga:date",
     "metrics": "ga:users",
     "hub": [
-      "ga:users",
+      "users",
       "profile",
-      "ga:date"
+      "date"
     ],
     "automatic": true,
     "download_by": "ga",
@@ -16,8 +16,8 @@
   },
   "fields": [
     {
-      "id": "ga:date",
-      "name": "ga:date",
+      "id": "date",
+      "name": "date",
       "order": "g1",
       "type": "date-false",
       "custom": {
@@ -26,8 +26,8 @@
       "enabled": true
     },
     {
-      "id": "ga:users",
-      "name": "ga:users",
+      "id": "users",
+      "name": "users",
       "order": "g2",
       "type": "integer",
       "custom": {

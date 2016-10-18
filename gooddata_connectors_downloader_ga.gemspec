@@ -26,5 +26,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'simplecov', '~> 0.10', '>= 0.10.0'
   spec.add_dependency 'activesupport', '~> 4.1', '>= 4.1.0'
   spec.add_dependency 'gooddata', '~> 0.6', '>= 0.6.12'
-  spec.add_dependency 'google-api-client', '~> 0.9'
+  # spec.add_dependency 'google-api-client', '~> 0.9'
 end

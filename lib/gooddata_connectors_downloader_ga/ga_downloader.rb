@@ -2,12 +2,13 @@ module GoodData
   module Connectors
     module GoogleAnalyticsDownloader
       class DownloaderGoogleAnalytics < Base::BaseDownloader
-        attr_accessor :ga
+        attr_accessor :ga, :client
 
         require 'active_support/all'
-        require 'google/apis/analyticsreporting_v4'
+        # require 'google/apis/analyticsreporting_v4'
+        # GA = Google::Apis::AnalyticsreportingV4
+        require 'google/api_client'
 
-        GA = Google::Apis::AnalyticsreportingV4
         TYPE = 'ga'.freeze
         CUSTOM_FIELDS = %w(segment filter profile).freeze
 
@@ -19,12 +20,15 @@ module GoodData
         def connect
           $log.info 'Connecting to Google Analytics'
 
+          self.client = Google::APIClient.new
+          self.ga = client.discovered_api('analyticsreporting', 'v4')
+
           options = {}
           options[:refresh_token] = @metadata.get_configuration_by_type_and_key(TYPE, 'refresh_token')
           options[:client_id] = @metadata.get_configuration_by_type_and_key(TYPE, 'client_id')
           options[:client_secret] = @metadata.get_configuration_by_type_and_key(TYPE, 'client_secret')
 
-          self.ga = log_in(options)
+          log_in(options)
         end
 
         def get_dimensions(entity)
@@ -32,7 +36,7 @@ module GoodData
           return nil unless dimensions
           dimensions_arr = []
           dimensions.split(',').each do |dimension|
-            dimensions_arr << GA::Dimension.new(name: dimension)
+            dimensions_arr << {'name' => dimension}
           end
           dimensions_arr
         end
@@ -40,7 +44,7 @@ module GoodData
         def get_segments(line)
           segment = line['segment']
           return nil unless segment
-          [GA::Segment.new(segment_id: segment)]
+          [{'segmentId' => segment}]
         end
 
         def get_metrics(entity)
@@ -48,7 +52,7 @@ module GoodData
           raise 'Metrics are missing in entity configuration' unless metrics
           metrics_arr = []
           metrics.split(',').each do |metric|
-            metrics_arr << GA::Metric.new(expression: metric)
+            metrics_arr << {'expression' => metric}
           end
           metrics_arr
         end
@@ -63,27 +67,44 @@ module GoodData
           profile_id = line['profile_id']
           raise 'Missing profile id' unless profile_id
 
-          date_ranges = [GA::DateRange.new(start_date: start_date, end_date: end_date)]
-          report_request = GA::ReportRequest.new(
-            dimensions: get_dimensions(entity),
-            date_ranges: date_ranges,
-            segments: get_segments(line),
-            filters_expression: get_filters(line),
-            sampling_level: 'LARGE',
-            metrics: get_metrics(entity),
-            page_size: 10_000,
-            view_id: line['profile_id']
-          )
-          report_requests = GA::GetReportsRequest.new(report_requests: [report_request])
-          ga.batch_get_reports(report_requests).reports.first
+          date_ranges = [{"startDate" => start_date, "endDate" => end_date}]
+          parameters = {
+            'reportRequests'=> [
+            {
+              'viewId' => line['profile_id'],
+              'pageSize' => 10_000,
+              'samplingLevel' => 'LARGE',
+              'dateRanges' => date_ranges,
+              'metrics' => get_metrics(entity),
+              'filtersExpression' => get_filters(line),
+              'segments' => get_segments(line),
+              'dimensions' => get_dimensions(entity),
+            }]
+          }
+
+          response = send_report_request(parameters)
+          data = JSON.parse(response.body)
+          data['reports'].first
+        end
+
+        def send_report_request(parameters)
+          uri = URI.parse("https://analyticsreporting.googleapis.com")
+          http = Net::HTTP.new(uri.host, uri.port)
+          http.use_ssl = true
+          http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+          request = Net::HTTP::Post.new("/v4/reports:batchGet")
+          request.add_field('Content-Type', 'application/json')
+          request.add_field('Authorization', "Bearer #{client.authorization.access_token}")
+          request.body = parameters.to_json
+          http.request(request)
         end
 
         def save_report_data(entity, report, start_date, line)
           local_path = "output/#{entity.name}_#{start_date.to_i}.csv"
           CSV.open(local_path, 'w', col_sep: ',') do |csv|
             csv << get_headers(report)
-            report.data.rows.each do |row|
-              csv << row.dimensions + row.metrics.first.values + [line['segment'], line['filters'], line['profile_id']]
+            report['data']['rows'].each do |row|
+              csv << row['dimensions'] + row['metrics'].first['values'] + [line['segment'], line['filters'], line['profile_id']]
             end
           end
           local_path
@@ -140,21 +161,21 @@ module GoodData
         end
 
         def log_in(options)
-          ga = GA::AnalyticsReportingService.new
-          ga.authorization = Signet::OAuth2::Client.new(
+
+          # ga = GA::AnalyticsReportingService.new
+          client.authorization = Signet::OAuth2::Client.new(
             token_credential_uri: 'https://www.googleapis.com/oauth2/v3/token',
             client_id: options[:client_id],
             client_secret: options[:client_secret],
             refresh_token: options[:refresh_token],
             grant_type: 'refresh_token'
           )
-          ga.authorization.fetch_access_token!
-          ga
+          client.authorization.fetch_access_token!
         end
 
         def get_headers(report)
-          headers = report.column_header.dimensions
-          headers += report.column_header.metric_header.metric_header_entries.map(&:name)
+          headers = report['columnHeader']['dimensions']
+          headers += report['columnHeader']['metricHeader']['metricHeaderEntries'].map{|entry| entry['name']}
           headers + CUSTOM_FIELDS
         end
 
@@ -175,11 +196,11 @@ module GoodData
 
         def process_fields(report)
           fields = []
-          report.column_header.dimensions.each do |header|
+          report['columnHeader']['dimensions'].each do |header|
             fields << new_field(header, header == 'ga:date' ? 'date-false' : 'string-255')
           end
-          report.column_header.metric_header.metric_header_entries.each do |header|
-            fields << new_field(header.name, get_field_type(header.type))
+          report['columnHeader']['metricHeader']['metricHeaderEntries'].each do |header|
+            fields << new_field(header['name'], get_field_type(header['type']))
           end
           CUSTOM_FIELDS.each do |header|
             fields << new_field(header, 'string-255') # maybe less?
