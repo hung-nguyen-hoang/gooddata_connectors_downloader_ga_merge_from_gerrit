@@ -5,8 +5,6 @@ module GoodData
         attr_accessor :ga, :client
 
         require 'active_support/all'
-        # require 'google/apis/analyticsreporting_v4'
-        # GA = Google::Apis::AnalyticsreportingV4
         require 'google/api_client'
 
         TYPE = 'ga'.freeze
@@ -30,6 +28,61 @@ module GoodData
 
           log_in(options)
         end
+
+        def download_data
+          $log.info 'Processing queries info file'
+          csv = load_queries_csv
+
+          $log.info 'Downloading data from Google Analytics'
+          entities_data = {}
+
+          csv.each do |line|
+            entities_data[line['entity']] = [] unless entities_data[line['entity']]
+            entities_data[line['entity']] << line
+          end
+
+          entities_data.each do |entity_data|
+            next unless entity = @metadata.get_entity(entity_data[0])
+            process_entity_data(entity, entity_data[1])
+          end
+        end
+
+        def process_entity_data(entity, entity_data)
+          rolling_days = @metadata.get_configuration_by_type_and_key(TYPE, 'rolling_days') || 14
+          end_date = DateTime.now
+
+          $log.info "Downloading entity #{entity.name}"
+          reports = []
+          report_data = []
+
+          entity_data.each do |line|
+            start_date = get_start_date(entity, line, rolling_days)
+            report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
+            reports << report
+
+            # Compact data from all reports for entity
+            report_data << get_headers(report) if report_data.empty?
+
+            report['data']['rows'].each do |row|
+              report_data << row['dimensions'] + row['metrics'].first['values'] + [line['segment'], line['filters'], line['profile_id']]
+            end if report['data']['rows']
+          end
+
+          $log.info "Processing entity #{entity.name}"
+          local_path = save_report_data(entity, report_data)
+          load_metadata(entity, reports.first)
+          save_data(entity, local_path, end_date) if local_path
+        end
+
+        def validation_schema
+          File.join(File.dirname(__FILE__), 'schema/validation_schema.json')
+        end
+
+        def define_default_entities
+          []
+        end
+
+        private
 
         def get_dimensions(entity)
           dimensions = entity.custom['dimensions']
@@ -99,46 +152,28 @@ module GoodData
           http.request(request)
         end
 
-        def save_report_data(entity, report, start_date, line)
-          local_path = "output/#{entity.name}_#{start_date.to_i}.csv"
+        def get_start_date(entity, line, rolling_days)
+          # Save information about previous load per entity per profile id
+          full = @metadata.get_configuration_by_type_and_key(TYPE, 'full')
+          full |= entity.custom['full'].class == Array && (entity.custom['full'].include?['all'] || entity.custom['full'].include?[line['profile_id']])
+          cache = metadata.load_cache('previous_runtimes')
+          cache.hash[entity.id] = {} unless cache.hash[entity.id]
+          previous_runtime = cache.hash[entity.id][line['profile_id']]
+          start_date = previous_runtime.nil? || full ? DateTime.parse(line['initial_load_start_date']) : (DateTime.now - rolling_days.to_i.days)
+          cache.hash[entity.id][line['profile_id']] = start_date
+          metadata.save_cache(cache.id)
+          start_date
+        end
+
+        def save_report_data(entity, report_data)
+          local_path = "output/#{entity.name}_#{Time.now.to_i}.csv"
           CSV.open(local_path, 'w', col_sep: ',') do |csv|
-            csv << get_headers(report)
-            report['data']['rows'].each do |row|
-              csv << row['dimensions'] + row['metrics'].first['values'] + [line['segment'], line['filters'], line['profile_id']]
-            end
+            report_data.each do |row|
+              csv << row
+            end if report_data
           end
           local_path
         end
-
-        def download_data
-          $log.info 'Processing queries info file'
-          csv = load_queries_csv
-          $log.info 'Downloading data from Google Analytics'
-          csv.each do |line|
-            entity = @metadata.get_entity(line['entity'])
-            next unless entity
-            full = @metadata.get_configuration_by_type_and_key(TYPE, 'full')
-            rolling_days = @metadata.get_configuration_by_type_and_key(TYPE, 'rolling_days') || 14
-            start_date = entity.previous_runtime.empty? || !full ? (DateTime.now - rolling_days.to_i.days) : DateTime.parse(line['initial_load_start_date'])
-            end_date = DateTime.now
-            $log.info "Downloading entity #{entity.name}"
-            report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-            $log.info "Processing entity #{entity.name}"
-            local_path = save_report_data(entity, report, start_date, line)
-            load_metadata(entity, report)
-            save_data(entity, local_path, start_date, end_date) if local_path
-          end
-        end
-
-        def validation_schema
-          File.join(File.dirname(__FILE__), 'schema/validation_schema.json')
-        end
-
-        def define_default_entities
-          []
-        end
-
-        private
 
         def load_queries_csv
           queries_path = @metadata.get_configuration_by_type_and_key(TYPE, 'queries_info_file_path')
@@ -150,12 +185,12 @@ module GoodData
           CSV.parse(parsed_file, headers: true, header_converters: ->(h) { h.downcase }, row_sep: :auto, col_sep: ',')
         end
 
-        def save_data(metadata_entity, local_path, start_date, end_date)
+        def save_data(metadata_entity, local_path, end_date)
           $log.info 'Saving data to S3'
           local_path = pack_data(local_path)
           metadata_entity.store_runtime_param('source_filename', local_path)
           metadata_entity.store_runtime_param('date_to', end_date)
-          metadata_entity.store_runtime_param('date_from', start_date)
+          metadata_entity.store_runtime_param('date_from', Time.now)
           @metadata.save_data(metadata_entity)
           File.delete(local_path)
         end
@@ -276,6 +311,8 @@ module GoodData
             metadata_entity.custom['file_format'] = 'GZIP'
             metadata_entity.make_dirty
           end
+
+          # Remove "ga:" part, we do not want that
           metadata_entity.custom['hub'] = metadata_entity.custom['hub'].map{|key| key.split(':').last}
           metadata_entity.store_runtime_param('full', true) if metadata_entity.custom['full']
         end
