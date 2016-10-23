@@ -45,6 +45,7 @@ module GoodData
             next unless entity = @metadata.get_entity(entity_data[0])
             process_entity_data(entity, entity_data[1])
           end
+          create_profile_entity
         end
 
         def process_entity_data(entity, entity_data)
@@ -59,6 +60,10 @@ module GoodData
             start_date = get_start_date(entity, line, rolling_days)
             report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
             reports << report
+            while next_page_token = report['nextPageToken']
+              report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'), next_page_token)
+              reports << report
+            end
 
             # Compact data from all reports for entity
             report_data << get_headers(report) if report_data.empty?
@@ -83,6 +88,36 @@ module GoodData
         end
 
         private
+
+        def create_profile_entity
+          analytics = client.discovered_api('analytics', 'v3')
+          result = client.execute(
+            :api_method => analytics.management.profiles.list,
+            parameters: {accountId: '~all',webPropertyId: '~all'}
+          )
+          keys = result.data.items.first.to_hash.select{|k,v| v.class != Hash}.keys
+          entity = new_profile_entity(keys)
+          local_path = "output/profile_#{Time.now.to_i}.csv"
+          CSV.open(local_path, 'w', col_sep: ',') do |csv|
+            csv << keys
+            result.data.items.each do |row|
+              csv << keys.map{|key| row.to_hash[key]}
+            end if result.data.items
+          end
+          metadata.entities << entity
+          load_metadata(entity)
+          save_data(entity, local_path)
+        end
+
+        def new_profile_entity(keys)
+          entity = @metadata.get_entity('profile')
+          fields = []
+          keys.each do |name|
+            fields << new_field(name, 'string-255') # maybe less?
+          end
+          load_entity_fields(entity, nil, fields)
+          entity
+        end
 
         def get_dimensions(entity)
           dimensions = entity.custom['dimensions']
@@ -116,7 +151,7 @@ module GoodData
           filters.empty? ? nil : filters
         end
 
-        def get_report(entity, line, start_date, end_date)
+        def get_report(entity, line, start_date, end_date, next_page_token = nil)
           profile_id = line['profile_id']
           raise 'Missing profile id' unless profile_id
 
@@ -132,6 +167,7 @@ module GoodData
               'filtersExpression' => get_filters(line),
               'segments' => get_segments(line),
               'dimensions' => get_dimensions(entity),
+              'pageToken' => next_page_token
             }]
           }
 
@@ -185,7 +221,7 @@ module GoodData
           CSV.parse(parsed_file, headers: true, header_converters: ->(h) { h.downcase }, row_sep: :auto, col_sep: ',')
         end
 
-        def save_data(metadata_entity, local_path, end_date)
+        def save_data(metadata_entity, local_path, end_date = Time.now)
           $log.info 'Saving data to S3'
           local_path = pack_data(local_path)
           metadata_entity.store_runtime_param('source_filename', local_path)
@@ -214,15 +250,15 @@ module GoodData
           headers + CUSTOM_FIELDS
         end
 
-        def load_metadata(entity, report)
+        def load_metadata(entity, report = nil)
           return nil if entity.disabled?
-          load_entity_fields(entity, report)
+          load_entity_fields(entity, report) if report
           load_entity_custom_metadata(entity)
           metadata.save_entity(entity)
         end
 
-        def load_entity_fields(entity, report)
-          temporary_fields = process_fields(report)
+        def load_entity_fields(entity, report = nil, fields = nil)
+          temporary_fields = report ? process_fields(report) : fields
           diff = entity.diff_fields(temporary_fields)
           load_fields_from_source(diff, entity)
           disable_fields(diff, entity)
