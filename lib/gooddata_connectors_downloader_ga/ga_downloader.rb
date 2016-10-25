@@ -51,31 +51,37 @@ module GoodData
         def process_entity_data(entity, entity_data)
           rolling_days = @metadata.get_configuration_by_type_and_key(TYPE, 'rolling_days') || 14
           end_date = DateTime.now
+          local_path = nil
+          loaded_metadata = false
 
           $log.info "Downloading entity #{entity.name}"
-          reports = []
-          report_data = []
-
           entity_data.each do |line|
+            $log.info "Downloading profile #{line['profile_id']}"
             start_date = get_start_date(entity, line, rolling_days)
             report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-            reports << report
-            while next_page_token = report['nextPageToken']
-              report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'), next_page_token)
-              reports << report
+            next unless report
+            
+            loaded_metadata = load_metadata(entity, report) unless loaded_metadata
+
+            if local_path
+              append_report_data(local_path, report, line)
+            else
+              local_path = create_report_data(entity, report, line)
             end
 
-            # Compact data from all reports for entity
-            report_data << get_headers(report) if report_data.empty?
-
-            report['data']['rows'].each do |row|
-              report_data << row['dimensions'] + row['metrics'].first['values'] + [line['segment'], line['filters'], line['profile_id']]
-            end if report['data']['rows']
+            while next_page_token = report['nextPageToken']
+              $log.info "Downloaded #{report['nextPageToken']} rows"
+              next_report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'), next_page_token)
+              if next_report
+                report = next_report
+                append_report_data(local_path, report, line)
+              else
+                report['nextPageToken'] = nil
+              end
+            end
           end
 
           $log.info "Processing entity #{entity.name}"
-          local_path = save_report_data(entity, report_data)
-          load_metadata(entity, reports.first)
           save_data(entity, local_path, end_date) if local_path
         end
 
@@ -173,7 +179,7 @@ module GoodData
 
           response = send_report_request(parameters)
           data = JSON.parse(response.body)
-          data['reports'].first
+          data['reports']  ? data['reports'].first : nil
         end
 
         def send_report_request(parameters)
@@ -201,12 +207,22 @@ module GoodData
           start_date
         end
 
-        def save_report_data(entity, report_data)
+        def create_report_data(entity, report, line)
           local_path = "output/#{entity.name}_#{Time.now.to_i}.csv"
           CSV.open(local_path, 'w', col_sep: ',') do |csv|
-            report_data.each do |row|
-              csv << row
-            end if report_data
+            csv << get_headers(report)
+            report['data']['rows'].each do |row|
+              csv << row['dimensions'] + row['metrics'].first['values'] + [line['segment'], line['filters'], line['profile_id']]
+            end if report
+          end
+          local_path
+        end
+
+        def append_report_data(local_path, report, line)
+          CSV.open(local_path, 'a', col_sep: ',') do |csv|
+            report['data']['rows'].each do |row|
+              csv << row['dimensions'] + row['metrics'].first['values'] + [line['segment'], line['filters'], line['profile_id']]
+            end if report
           end
           local_path
         end
@@ -255,6 +271,7 @@ module GoodData
           load_entity_fields(entity, report) if report
           load_entity_custom_metadata(entity)
           metadata.save_entity(entity)
+          true
         end
 
         def load_entity_fields(entity, report = nil, fields = nil)

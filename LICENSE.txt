@@ -1,4 +1,4 @@
-GoodData Connectors Downloader Salesforce
+GoodData Connectors Downloader GoogleAnalytics
 BSD License
 Copyright (c) 2013, GoodData Corporation
 
