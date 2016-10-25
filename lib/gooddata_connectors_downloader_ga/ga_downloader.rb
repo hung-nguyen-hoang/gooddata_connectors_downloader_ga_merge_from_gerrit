@@ -59,8 +59,8 @@ module GoodData
             $log.info "Downloading profile #{line['profile_id']}"
             start_date = get_start_date(entity, line, rolling_days)
             report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-            next unless report
-            
+            next unless report && report['data']['rows']
+
             loaded_metadata = load_metadata(entity, report) unless loaded_metadata
 
             if local_path
