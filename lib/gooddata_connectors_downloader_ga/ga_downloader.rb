@@ -58,6 +58,7 @@ module GoodData
           entity_data.each do |line|
             $log.info "Downloading profile #{line['profile_id']}"
             start_date = get_start_date(entity, line, rolling_days)
+            $log.info "Downloading data from #{start_date} to #{end_date}"
             report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
             next unless report && report['data']['rows']
 
