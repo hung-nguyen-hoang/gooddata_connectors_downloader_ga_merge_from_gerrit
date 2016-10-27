@@ -286,7 +286,7 @@ module GoodData
         def process_fields(report)
           fields = []
           report['columnHeader']['dimensions'].each do |header|
-            fields << new_field(header, header == 'ga:date' ? 'date-false' : 'string-255')
+            fields << new_field(header, header == 'ga:date' ? 'date-false' : 'string-1024')
           end
           report['columnHeader']['metricHeader']['metricHeaderEntries'].each do |header|
             fields << new_field(header['name'], get_field_type(header['type']))
@@ -310,7 +310,7 @@ module GoodData
           when 'PERCENT'
             return 'decimal-30-15'
           else
-            return 'string-255'
+            return 'string-1024'
           end
         end
 
