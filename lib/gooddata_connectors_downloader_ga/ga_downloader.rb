@@ -108,7 +108,7 @@ module GoodData
           CSV.open(local_path, 'w', col_sep: ',') do |csv|
             csv << keys
             result.data.items.each do |row|
-              csv << keys.map{|key| row.to_hash[key]}
+              csv << keys.map{|key| key=="id" ? "ga:#{row.to_hash[key]}" : row.to_hash[key]}
             end if result.data.items
           end
           metadata.entities << entity
