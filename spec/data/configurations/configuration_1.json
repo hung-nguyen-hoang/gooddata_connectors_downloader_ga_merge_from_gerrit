@@ -60,8 +60,8 @@
   },
   "ga": {
     "queries_info_file_path":"AIDAJFITXNOA7ZNFS3H4U_gdc-ms-connectors_ConnectorsTestSuite/testing/unit/ga_queries.csv",
-    "client_id": "309132283222-gauqrlg252aok1prqr9vnvp0imdc7ces.apps.googleusercontent.com",
-    "client_secret": "phX3tpCQnn4U-DoCNRiSSAkt",
-    "refresh_token": "1/g1-Bi6HTAdG449tTW5uagQM6KmSNMkyhmy47Lns3xbw"
+    "client_id": "TO DO: CREATE TEST PROFILE",
+    "client_secret": "TO DO: CREATE TEST PROFILE",
+    "refresh_token": "TO DO: CREATE TEST PROFILE"
   }
 }
