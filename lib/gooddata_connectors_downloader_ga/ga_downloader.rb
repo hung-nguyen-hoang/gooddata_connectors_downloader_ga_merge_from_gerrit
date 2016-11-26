@@ -302,7 +302,7 @@ module GoodData
           when 'INTEGER'
             return 'integer'
           when 'TIME'
-            return 'decimal-30-15'
+            return 'date-true'
           when 'CURRENCY'
             return 'decimal-30-15'
           when 'FLOAT'
