@@ -104,6 +104,7 @@ module GoodData
           )
           keys = result.data.items.first.to_hash.select{|k,v| v.class != Hash}.keys
           entity = new_profile_entity(keys)
+          return nil unless entity
           local_path = "output/profile_#{Time.now.to_i}.csv"
           CSV.open(local_path, 'w', col_sep: ',') do |csv|
             csv << keys
@@ -117,11 +118,14 @@ module GoodData
         end
 
         def new_profile_entity(keys)
-          entity = @metadata.get_entity('profile')
+          entity = metadata.list_entities.select{|entity| entity.custom && entity.custom['type'] == 'ga_profile'}.first
+          return nil unless entity
+
           fields = []
           keys.each do |name|
             fields << new_field(name, 'string-255') # maybe less?
           end
+          entity.custom['full'] = true
           load_entity_fields(entity, nil, fields)
           entity
         end
