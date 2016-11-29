@@ -306,7 +306,7 @@ module GoodData
           when 'INTEGER'
             return 'integer'
           when 'TIME'
-            return 'date-true'
+            return 'date-false'
           when 'CURRENCY'
             return 'decimal-30-15'
           when 'FLOAT'
