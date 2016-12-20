@@ -102,7 +102,9 @@ module GoodData
             :api_method => analytics.management.profiles.list,
             parameters: {accountId: '~all',webPropertyId: '~all'}
           )
-          keys = result.data.items.first.to_hash.select{|k,v| v.class != Hash}.keys
+          items = result.data.items
+          raise 'You have insufficient privileges or user does not have any Google Analytics account' if items.empty?
+          keys = items.first.to_hash.select{|k,v| v.class != Hash}.keys
           entity = new_profile_entity(keys)
           return nil unless entity
           local_path = "output/profile_#{Time.now.to_i}.csv"
