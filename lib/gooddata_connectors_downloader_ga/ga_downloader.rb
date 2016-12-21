@@ -84,6 +84,7 @@ module GoodData
 
           $log.info "Processing entity #{entity.name}"
           save_data(entity, local_path, end_date) if local_path
+          $log.info "Entity #{entity.name} processed"
         end
 
         def validation_schema
@@ -97,16 +98,19 @@ module GoodData
         private
 
         def create_profile_entity
+          entity = metadata.list_entities.select{|entity| entity.custom && entity.custom['type'] == 'ga_profile'}.first
+          return nil unless entity
+
           analytics = client.discovered_api('analytics', 'v3')
           result = client.execute(
             :api_method => analytics.management.profiles.list,
             parameters: {accountId: '~all',webPropertyId: '~all'}
           )
+
           items = result.data.items
-          raise 'You have insufficient privileges or user does not have any Google Analytics account' if items.empty?
+          raise 'You have insufficient privileges or user does not have any Google Analytics accounts' if items.empty?
           keys = items.first.to_hash.select{|k,v| v.class != Hash}.keys
-          entity = new_profile_entity(keys)
-          return nil unless entity
+          entity = new_profile_entity(entity, keys)
           local_path = "output/profile_#{Time.now.to_i}.csv"
           CSV.open(local_path, 'w', col_sep: ',') do |csv|
             csv << keys
@@ -119,10 +123,7 @@ module GoodData
           save_data(entity, local_path)
         end
 
-        def new_profile_entity(keys)
-          entity = metadata.list_entities.select{|entity| entity.custom && entity.custom['type'] == 'ga_profile'}.first
-          return nil unless entity
-
+        def new_profile_entity(entity, keys)
           fields = []
           keys.each do |name|
             fields << new_field(name, 'string-255') # maybe less?
