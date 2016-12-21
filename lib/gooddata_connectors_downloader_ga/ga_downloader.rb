@@ -197,7 +197,7 @@ module GoodData
           request.add_field('Content-Type', 'application/json')
           request.add_field('Authorization', "Bearer #{client.authorization.access_token}")
           request.body = parameters.to_json
-          http.request(request)
+          response = http.request(request)
           JSON.parse(response.body)
         rescue JSON::ParserError
           raise "Error: #{response.body}" if wait > 64
