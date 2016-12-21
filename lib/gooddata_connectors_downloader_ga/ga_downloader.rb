@@ -184,13 +184,11 @@ module GoodData
               'pageToken' => next_page_token
             }]
           }
-
-          response = send_report_request(parameters)
-          data = JSON.parse(response.body)
+          data = send_report_request(parameters)
           data['reports']  ? data['reports'].first : nil
         end
 
-        def send_report_request(parameters)
+        def send_report_request(parameters, wait = 2)
           uri = URI.parse("https://analyticsreporting.googleapis.com")
           http = Net::HTTP.new(uri.host, uri.port)
           http.use_ssl = true
@@ -200,6 +198,11 @@ module GoodData
           request.add_field('Authorization', "Bearer #{client.authorization.access_token}")
           request.body = parameters.to_json
           http.request(request)
+          JSON.parse(response.body)
+        rescue JSON::ParserError
+          raise "Error: #{response.body}" if wait > 64
+          $log.info "Error occured, waiting #{wait} seconds."
+          send_report_request(parameters, wait * 2)
         end
 
         def get_start_date(entity, line, rolling_days)
