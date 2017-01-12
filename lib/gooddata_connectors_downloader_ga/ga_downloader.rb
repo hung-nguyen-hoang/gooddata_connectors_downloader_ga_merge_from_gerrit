@@ -331,35 +331,6 @@ module GoodData
                               'custom' => {})
         end
 
-        def load_fields_from_source(diff, metadata_entity)
-          diff['only_in_target'].each do |target_field|
-            $log.info "Adding new field #{target_field.name} to entity #{metadata_entity.id}"
-            target_field.order = metadata_entity.get_new_order_id
-            metadata_entity.add_field(target_field)
-            metadata_entity.make_dirty
-          end
-        end
-
-        def disable_fields(diff, metadata_entity)
-          diff['only_in_source'].each do |source_field|
-            next if source_field.disabled?
-            $log.info "Disabling field #{source_field.name} in entity #{metadata_entity.id}"
-            source_field.disable('From synchronization with source system')
-            metadata_entity.make_dirty
-          end
-        end
-
-        def change_fields(diff, metadata_entity)
-          diff['changed'].each do |change|
-            source_field = change['source_field']
-            $log.info "The field #{source_field.name} in entity #{metadata_entity.id} has changed"
-            source_field.name = change['target_field'].name if change.include?('name')
-            source_field.type = change['target_field'].type if change.include?('type')
-            source_field.enabled = change['target_field'].enabled if change.include?('disabled')
-            metadata_entity.make_dirty
-          end
-        end
-
         def load_entity_custom_metadata(metadata_entity)
           if !metadata_entity.custom.include?('download_by') || metadata_entity.custom['download_by'] != TYPE
             metadata_entity.custom['download_by'] = TYPE
@@ -381,11 +352,6 @@ module GoodData
           metadata_entity.store_runtime_param('full', true) if metadata_entity.custom['full']
         end
 
-        def pack_data(input_filename)
-          gzip = input_filename + '.gz'
-          `gzip #{input_filename}`
-          gzip
-        end
       end
     end
   end
