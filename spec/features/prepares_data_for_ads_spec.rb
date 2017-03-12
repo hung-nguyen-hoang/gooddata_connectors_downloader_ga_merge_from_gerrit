@@ -46,10 +46,9 @@ describe 'Downloading data and preparing metadata and files for ads integrator',
     expect(metadata).to eq expected_metadata
   end
 
-
-  def get_metadata(batch, entity = "")
+  def get_metadata(batch, entity = '')
     parsed_batch = JSON.parse(batch)
-    s3object = S3Helper.get_object(parsed_batch['files'].select {|file| file['entity'].match "#{entity}"}.first['file'])
+    s3object = S3Helper.get_object(parsed_batch['files'].select { |file| file['entity'].match entity.to_s }.first['file'])
     s3object.metadata.to_h.to_hash.to_s
   end
 

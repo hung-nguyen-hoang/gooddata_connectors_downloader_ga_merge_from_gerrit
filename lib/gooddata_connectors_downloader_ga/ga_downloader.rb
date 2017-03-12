@@ -98,24 +98,24 @@ module GoodData
         private
 
         def create_profile_entity
-          entity = metadata.list_entities.select{|entity| entity.custom && entity.custom['type'] == 'ga_profile'}.first
+          entity = metadata.list_entities.select { |entity| entity.custom && entity.custom['type'] == 'ga_profile' }.first
           return nil unless entity
 
           analytics = client.discovered_api('analytics', 'v3')
           result = client.execute(
-            :api_method => analytics.management.profiles.list,
-            parameters: {accountId: '~all',webPropertyId: '~all'}
+            api_method: analytics.management.profiles.list,
+            parameters: { accountId: '~all', webPropertyId: '~all' }
           )
 
           items = result.data.items
           raise 'You have insufficient privileges or user does not have any Google Analytics accounts' if items.empty?
-          keys = items.first.to_hash.select{|k,v| v.class != Hash}.keys
+          keys = items.first.to_hash.select { |_k, v| v.class != Hash }.keys
           entity = new_profile_entity(entity, keys)
           local_path = "output/profile_#{Time.now.to_i}.csv"
           CSV.open(local_path, 'w', col_sep: ',') do |csv|
             csv << keys
             result.data.items.each do |row|
-              csv << keys.map{|key| key=="id" ? "ga:#{row.to_hash[key]}" : row.to_hash[key]}
+              csv << keys.map { |key| key == 'id' ? "ga:#{row.to_hash[key]}" : row.to_hash[key] }
             end if result.data.items
           end
           metadata.entities << entity
@@ -138,7 +138,7 @@ module GoodData
           return nil unless dimensions
           dimensions_arr = []
           dimensions.split(',').each do |dimension|
-            dimensions_arr << {'name' => dimension}
+            dimensions_arr << { 'name' => dimension }
           end
           dimensions_arr
         end
@@ -146,7 +146,7 @@ module GoodData
         def get_segments(line)
           segment = line['segment']
           return nil unless segment
-          [{'segmentId' => segment}]
+          [{ 'segmentId' => segment }]
         end
 
         def get_metrics(entity)
@@ -154,7 +154,7 @@ module GoodData
           raise 'Metrics are missing in entity configuration' unless metrics
           metrics_arr = []
           metrics.split(',').each do |metric|
-            metrics_arr << {'expression' => metric}
+            metrics_arr << { 'expression' => metric }
           end
           metrics_arr
         end
@@ -169,31 +169,32 @@ module GoodData
           profile_id = line['profile_id']
           raise 'Missing profile id' unless profile_id
 
-          date_ranges = [{"startDate" => start_date, "endDate" => end_date}]
+          date_ranges = [{ 'startDate' => start_date, 'endDate' => end_date }]
           parameters = {
-            'reportRequests'=> [
-            {
-              'viewId' => line['profile_id'],
-              'pageSize' => 10_000,
-              'samplingLevel' => 'LARGE',
-              'dateRanges' => date_ranges,
-              'metrics' => get_metrics(entity),
-              'filtersExpression' => get_filters(line),
-              'segments' => get_segments(line),
-              'dimensions' => get_dimensions(entity),
-              'pageToken' => next_page_token
-            }]
+            'reportRequests' => [
+              {
+                'viewId' => line['profile_id'],
+                'pageSize' => 10_000,
+                'samplingLevel' => 'LARGE',
+                'dateRanges' => date_ranges,
+                'metrics' => get_metrics(entity),
+                'filtersExpression' => get_filters(line),
+                'segments' => get_segments(line),
+                'dimensions' => get_dimensions(entity),
+                'pageToken' => next_page_token
+              }
+            ]
           }
           data = send_report_request(parameters)
-          data['reports']  ? data['reports'].first : nil
+          data['reports'] ? data['reports'].first : nil
         end
 
         def send_report_request(parameters, wait = 2)
-          uri = URI.parse("https://analyticsreporting.googleapis.com")
+          uri = URI.parse('https://analyticsreporting.googleapis.com')
           http = Net::HTTP.new(uri.host, uri.port)
           http.use_ssl = true
           http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-          request = Net::HTTP::Post.new("/v4/reports:batchGet")
+          request = Net::HTTP::Post.new('/v4/reports:batchGet')
           request.add_field('Content-Type', 'application/json')
           request.add_field('Authorization', "Bearer #{client.authorization.access_token}")
           request.body = parameters.to_json
@@ -259,7 +260,6 @@ module GoodData
         end
 
         def log_in(options)
-
           # ga = GA::AnalyticsReportingService.new
           client.authorization = Signet::OAuth2::Client.new(
             token_credential_uri: 'https://www.googleapis.com/oauth2/v3/token',
@@ -273,7 +273,7 @@ module GoodData
 
         def get_headers(report)
           headers = report['columnHeader']['dimensions']
-          headers += report['columnHeader']['metricHeader']['metricHeaderEntries'].map{|entry| entry['name']}
+          headers += report['columnHeader']['metricHeader']['metricHeaderEntries'].map { |entry| entry['name'] }
           headers + CUSTOM_FIELDS
         end
 
@@ -348,10 +348,9 @@ module GoodData
           end
 
           # Remove "ga:" part, we do not want that
-          metadata_entity.custom['hub'] = metadata_entity.custom['hub'].map{|key| key.split(':').last}
+          metadata_entity.custom['hub'] = metadata_entity.custom['hub'].map { |key| key.split(':').last }
           metadata_entity.store_runtime_param('full', true) if metadata_entity.custom['full']
         end
-
       end
     end
   end

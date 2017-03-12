@@ -30,3 +30,6 @@ MethodLength:
 
 Style/GlobalVars:
   Enabled: false
+
+Lint/AssignmentInCondition:
+  Enabled: false
