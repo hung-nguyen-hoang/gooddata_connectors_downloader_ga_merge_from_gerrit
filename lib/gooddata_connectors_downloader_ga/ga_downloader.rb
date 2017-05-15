@@ -186,6 +186,7 @@ module GoodData
             ]
           }
           data = send_report_request(parameters)
+          raise data['error']['message'] if data['error']
           data['reports'] ? data['reports'].first : nil
         end
 
