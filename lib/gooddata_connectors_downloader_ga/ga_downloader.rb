@@ -138,7 +138,7 @@ module GoodData
           return nil unless dimensions
           dimensions_arr = []
           dimensions.split(',').each do |dimension|
-            dimensions_arr << { 'name' => dimension }
+            dimensions_arr << { 'name' => dimension.strip }
           end
           dimensions_arr
         end
@@ -154,7 +154,7 @@ module GoodData
           raise 'Metrics are missing in entity configuration' unless metrics
           metrics_arr = []
           metrics.split(',').each do |metric|
-            metrics_arr << { 'expression' => metric }
+            metrics_arr << { 'expression' => metric.strip }
           end
           metrics_arr
         end
