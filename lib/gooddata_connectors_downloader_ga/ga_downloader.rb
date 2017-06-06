@@ -201,8 +201,8 @@ module GoodData
           request.body = parameters.to_json
           response = http.request(request)
           JSON.parse(response.body)
-        rescue JSON::ParserError
-          raise "Error: #{response.body}" if wait > 64
+        rescue => e
+          raise "Error: #{e}" if wait > 64
           $log.info "Error occured, waiting #{wait} seconds."
           send_report_request(parameters, wait * 2)
         end
