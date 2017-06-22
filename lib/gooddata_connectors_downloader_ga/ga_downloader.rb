@@ -42,6 +42,7 @@ module GoodData
           end
 
           entities_data.each do |entity_data|
+            next unless @metadata.get_downloader_entities_ids.include?(entity_data[0])
             next unless entity = @metadata.get_entity(entity_data[0])
             process_entity_data(entity, entity_data[1])
           end
@@ -60,24 +61,30 @@ module GoodData
             start_date = get_start_date(entity, line, rolling_days)
             $log.info "Downloading data from #{start_date.strftime('%Y-%m-%d')} to #{end_date.strftime('%Y-%m-%d')}"
             report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-            next unless report && report['data']['rows']
-
+            unless report && report['data']['rows']
+              $log.info "No data downloaded, please check your configuration if you expect some"
+              next
+            end
+            samples_rows = report['data']['samplesReadCounts']
+            date_ranges = get_date_ranges(start_date, end_date, samples_rows != nil)
             loaded_metadata = load_metadata(entity, report) unless loaded_metadata
 
-            if local_path
-              append_report_data(local_path, report, line)
-            else
-              local_path = create_report_data(entity, report, line)
-            end
-
-            while next_page_token = report['nextPageToken']
-              $log.info "Downloaded #{report['nextPageToken']} rows"
-              next_report = get_report(entity, line, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'), next_page_token)
-              if next_report
-                report = next_report
+            date_ranges.each do |range|
+              report = get_report(entity, line, range[0].strftime('%Y-%m-%d'), range[1].strftime('%Y-%m-%d'))
+              if local_path
                 append_report_data(local_path, report, line)
               else
-                report['nextPageToken'] = nil
+                local_path = create_report_data(entity, report, line)
+              end
+              while next_page_token = report['nextPageToken']
+                $log.info "Downloaded #{report['nextPageToken']} rows"
+                next_report = get_report(entity, line, range[0].strftime('%Y-%m-%d'), range[1].strftime('%Y-%m-%d'), next_page_token)
+                if next_report
+                  report = next_report
+                  append_report_data(local_path, report, line)
+                else
+                  report['nextPageToken'] = nil
+                end
               end
             end
           end
@@ -188,6 +195,19 @@ module GoodData
           data = send_report_request(parameters)
           raise data['error']['message'] if data['error']
           data['reports'] ? data['reports'].first : nil
+        end
+
+        def get_date_ranges(start_date, end_date, samples)
+          return [[start_date, end_date]] unless samples
+          max_range = 3
+          arr = []
+          loop do
+            next_date = start_date + max_range.days >= end_date ? end_date : start_date + max_range.days
+            arr << [start_date, next_date]
+            break if next_date == end_date
+            start_date = next_date + 1
+          end
+          arr
         end
 
         def send_report_request(parameters, wait = 2)
