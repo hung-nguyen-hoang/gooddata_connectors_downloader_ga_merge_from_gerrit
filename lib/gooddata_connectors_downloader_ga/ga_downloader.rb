@@ -255,7 +255,7 @@ module GoodData
           CSV.open(local_path, 'a', col_sep: ',') do |csv|
             report['data']['rows'].each do |row|
               csv << row['dimensions'] + row['metrics'].first['values'] + [line['segment'], line['filters'], line['profile_id']]
-            end if report
+            end if report && report['data']['rows']
           end
           local_path
         end
