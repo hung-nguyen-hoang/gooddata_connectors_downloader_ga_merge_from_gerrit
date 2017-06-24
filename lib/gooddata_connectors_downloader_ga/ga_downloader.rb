@@ -204,7 +204,7 @@ module GoodData
           loop do
             next_date = start_date + max_range.days >= end_date ? end_date : start_date + max_range.days
             arr << [start_date, next_date]
-            break if next_date == end_date
+            break if next_date >= end_date
             start_date = next_date + 1
           end
           arr
