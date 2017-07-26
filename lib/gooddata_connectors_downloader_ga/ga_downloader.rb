@@ -2,7 +2,7 @@ module GoodData
   module Connectors
     module GoogleAnalyticsDownloader
       class DownloaderGoogleAnalytics < Base::BaseDownloader
-        attr_accessor :ga, :client
+        attr_accessor :queries, :ga, :client
 
         require 'active_support/all'
         require 'google/api_client'
@@ -12,6 +12,7 @@ module GoodData
 
         def initialize(metadata, options = {})
           $now = GoodData::Connectors::Metadata::Runtime.now
+          self.queries = load_queries_file(options)
           super(metadata, options)
         end
 
@@ -30,13 +31,10 @@ module GoodData
         end
 
         def download_data
-          $log.info 'Processing queries info file'
-          csv = load_queries_csv
-
           $log.info 'Downloading data from Google Analytics'
           entities_data = {}
 
-          csv.each do |line|
+          queries.each do |line|
             entities_data[line['entity']] = [] unless entities_data[line['entity']]
             entities_data[line['entity']] << line
           end
@@ -152,7 +150,7 @@ module GoodData
 
         def get_segments(line)
           segment = line['segment']
-          return nil unless segment
+          return nil if segment.nil? || segment.empty?
           [{ 'segmentId' => segment }]
         end
 

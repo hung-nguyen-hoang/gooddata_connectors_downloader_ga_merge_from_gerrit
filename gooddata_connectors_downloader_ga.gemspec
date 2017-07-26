@@ -25,5 +25,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'rubocop', '~> 0.41.2'
   spec.add_development_dependency 'simplecov', '~> 0.10', '>= 0.10.0'
   spec.add_dependency 'activesupport', '~> 4.1', '>= 4.1.0'
-  spec.add_dependency 'gooddata', '~> 0.6', '>= 0.6.12'
+  spec.add_dependency 'gooddata', '~> 0.6', '= 0.6.50'
+  spec.add_dependency 'gooddata_datawarehouse'
 end
