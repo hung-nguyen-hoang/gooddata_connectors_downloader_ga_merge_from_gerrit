@@ -201,8 +201,8 @@ module GoodData
           arr = []
           loop do
             next_date = start_date + max_range.days >= end_date ? end_date : start_date + max_range.days
+            break if start_date > next_date
             arr << [start_date, next_date]
-            break if next_date >= end_date
             start_date = next_date + 1
           end
           arr
@@ -258,15 +258,15 @@ module GoodData
           local_path
         end
 
-        def load_queries_csv
-          queries_path = @metadata.get_configuration_by_type_and_key(TYPE, 'queries_info_file_path')
-          raise 'You need to provide path to queries source file' unless queries_path
-          file = queries_path.split('/').last
-          local_path = "tmp/#{file}"
-          @metadata.download_data(queries_path, local_path)
-          parsed_file = File.open(local_path, 'r:bom|utf-8').read.delete("'")
-          CSV.parse(parsed_file, headers: true, header_converters: ->(h) { h.downcase }, row_sep: :auto, col_sep: ',')
-        end
+        # def load_queries_csv
+        #   queries_path = @metadata.get_configuration_by_type_and_key(TYPE, 'queries_info_file_path')
+        #   raise 'You need to provide path to queries source file' unless queries_path
+        #   file = queries_path.split('/').last
+        #   local_path = "tmp/#{file}"
+        #   @metadata.download_data(queries_path, local_path)
+        #   parsed_file = File.open(local_path, 'r:bom|utf-8').read.delete("'")
+        #   CSV.parse(parsed_file, headers: true, header_converters: ->(h) { h.downcase }, row_sep: :auto, col_sep: ',')
+        # end
 
         def save_data(metadata_entity, local_path, end_date = Time.now)
           $log.info 'Saving data to S3'
