@@ -218,7 +218,13 @@ module GoodData
           request.add_field('Authorization', "Bearer #{client.authorization.access_token}")
           request.body = parameters.to_json
           response = http.request(request)
-          JSON.parse(response.body)
+          data = JSON.parse(response.body)
+          if data['error'] && data['error']['status'] == 'UNAUTHENTICATED' && wait == 2
+            $log.info 'Fetching new access token.'
+            client.authorization.fetch_access_token!
+            send_report_request(parameters, wait * 2)
+          end
+          data
         rescue => e
           raise "Error: #{e}" if wait > 64
           $log.info "Error occured, waiting #{wait} seconds."
@@ -232,7 +238,9 @@ module GoodData
           cache = metadata.load_cache('previous_runtimes')
           cache.hash[entity.id] = {} unless cache.hash[entity.id]
           previous_runtime = cache.hash[entity.id][line['profile_id']]
-          start_date = previous_runtime.nil? || full ? DateTime.parse(line['initial_load_start_date']) : (DateTime.now - rolling_days.to_i.days)
+          initial_load_start_date = line['initial_load_start_date']
+          initial_load_start_date = DateTime.parse(initial_load_start_date) if initial_load_start_date.instance_of?(String)
+          start_date = previous_runtime.nil? || full ? initial_load_start_date : (DateTime.now - rolling_days.to_i.days)
           cache.hash[entity.id][line['profile_id']] = start_date
           metadata.save_cache(cache.id)
           start_date
