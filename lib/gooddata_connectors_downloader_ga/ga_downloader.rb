@@ -252,7 +252,7 @@ module GoodData
             csv << get_headers(report)
             report['data']['rows'].each do |row|
               csv << row['dimensions'] + row['metrics'].first['values'] + [line['segment'], line['filters'], line['profile_id']]
-            end if report
+            end if report && report.dig('custom','rows')
           end
           local_path
         end
